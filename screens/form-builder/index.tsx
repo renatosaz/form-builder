@@ -153,7 +153,6 @@ export default function FormBuilder() {
             <div className="col-span-1 w-full h-full space-y-3">
               <SpecialComponentsNotice formFields={formFields} />
               <FormPreview
-                key={JSON.stringify(formFields)}
                 formFields={formFields}
               />
             </div>

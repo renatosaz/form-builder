@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { Highlight, themes } from 'prism-react-renderer'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
@@ -9,10 +9,11 @@ import { renderFormField } from '@/screens/render-form-field'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Form, FormField, FormItem, FormControl } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import If from '@/components/ui/if'
 import { FormFieldType } from '@/types'
 
-import { Files } from 'lucide-react'
+import { Files, Save } from 'lucide-react'
 import {
   generateZodSchema,
   generateFormCode,
@@ -91,9 +92,20 @@ const renderFormFields = (fields: FormFieldOrGroup[], form: any) => {
 }
 
 export const FormPreview: React.FC<FormPreviewProps> = ({ formFields }) => {
-  const formSchema = generateZodSchema(formFields)
+  const [jsonContent, setJsonContent] = useState<string>(
+    JSON.stringify(formFields, null, 2)
+  );
+  const [currentFormFields, setCurrentFormFields] = useState<FormFieldOrGroup[]>(formFields);
+  const [jsonError, setJsonError] = useState<string | null>(null);
 
-  const defaultVals = generateDefaultValues(formFields)
+  useEffect(() => {
+    // Update JSON content when formFields prop changes
+    setJsonContent(JSON.stringify(formFields, null, 2));
+    setCurrentFormFields(formFields);
+  }, [formFields]);
+
+  const formSchema = generateZodSchema(currentFormFields)
+  const defaultVals = generateDefaultValues(currentFormFields)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -113,7 +125,24 @@ export const FormPreview: React.FC<FormPreviewProps> = ({ formFields }) => {
     }
   }
 
-  const generatedCode = generateFormCode(formFields)
+  const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setJsonContent(e.target.value);
+    setJsonError(null);
+  };
+
+  const applyJsonChanges = () => {
+    try {
+      const parsedJson = JSON.parse(jsonContent);
+      setCurrentFormFields(parsedJson);
+      toast.success('Form updated successfully!');
+    } catch (error) {
+      console.error('JSON parsing error', error);
+      setJsonError('Invalid JSON format. Please check your syntax.');
+      toast.error('Invalid JSON format. Please check your syntax.');
+    }
+  };
+
+  const generatedCode = generateFormCode(currentFormFields)
   const formattedCode = formatJSXCode(generatedCode)
 
   return (
@@ -129,14 +158,14 @@ export const FormPreview: React.FC<FormPreviewProps> = ({ formFields }) => {
           className="space-y-4 h-full md:max-h-[70vh] overflow-auto"
         >
           <If
-            condition={formFields.length > 0}
+            condition={currentFormFields.length > 0}
             render={() => (
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
                   className="space-y-4 py-5 max-w-lg mx-auto"
                 >
-                  {renderFormFields(formFields, form)}
+                  {renderFormFields(currentFormFields, form)}
                   <Button type="submit">Submit</Button>
                 </form>
               </Form>
@@ -148,24 +177,34 @@ export const FormPreview: React.FC<FormPreviewProps> = ({ formFields }) => {
             )}
           />
         </TabsContent>
-        <TabsContent value="json">
-          <If
-            condition={formFields.length > 0}
-            render={() => (
-              <pre className="p-4 text-sm bg-secondary rounded-lg h-full md:max-h-[70vh] overflow-auto">
-                {JSON.stringify(formFields, null, 2)}
-              </pre>
-            )}
-            otherwise={() => (
-              <div className="h-[50vh] flex justify-center items-center">
-                <p>No form element selected yet.</p>
+        <TabsContent value="json" className="p-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-end">
+              <Button 
+                onClick={applyJsonChanges} 
+                className="flex items-center gap-2"
+                variant="outline"
+              >
+                <Save className="h-4 w-4" />
+                Apply Changes
+              </Button>
+            </div>
+            {jsonError && (
+              <div className="p-2 text-sm text-red-500 bg-red-50 rounded-md">
+                {jsonError}
               </div>
             )}
-          />
+            <textarea
+              value={jsonContent}
+              onChange={handleJsonChange}
+              className="w-full h-[60vh] p-4 font-mono text-sm rounded-md border border-gray-300"
+              spellCheck="false"
+            />
+          </div>
         </TabsContent>
         <TabsContent value="code">
           <If
-            condition={formFields.length > 0}
+            condition={currentFormFields.length > 0}
             render={() => (
               <div className="relative">
                 <Button
